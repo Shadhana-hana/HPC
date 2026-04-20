@@ -1,0 +1,83 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <omp.h>
+#define N 1000
+int main()
+{
+   int *A,*B,*C,i;
+   A = (int*)malloc(N*sizeof(int));
+   B = (int*)malloc(N*sizeof(int));
+   C = (int*)malloc(N*sizeof(int));
+   for(i=0;i<N;i++)
+   {
+      A[i]=rand()%15;
+      B[i]=rand()%10;
+   }
+   printf("Array A:\n");
+   for(i=0;i<5;i++)
+    {
+      printf("%d\t",A[i]);
+    }
+   printf("\nArray B:\n");
+   for(i=0;i<5;i++)
+    {
+       printf("%d\t",B[i]);
+    }
+   double start = omp_get_wtime();
+   #pragma omp parallel for
+   for(i=0;i<N;i++)
+   {
+      C[i] = A[i] + B[i];
+   }
+   double end = omp_get_wtime();
+   printf("\nTime Taken : %f seconds \n",end-start);
+   printf("Resultant Array\n:");
+   for(i=0;i<5;i++)
+   {
+      printf("%d\t",C[i]);
+   }
+   free(A);
+   free(B);
+   free(C);
+   return 0;
+}
+------
+cat cons.c
+#include <stdio.h>
+#include <stdlib.h>
+#include <omp.h>
+#include <math.h>
+#define N 1000
+int main()
+{
+   int *A,*B,*C,i;
+   int n;
+   A = (int*)malloc(N*sizeof(int));
+   printf("Enter the constant to be added:\n");
+   scanf("%d",&n);
+   for(i=0;i<N;i++)
+   {
+      A[i]=rand()%15;
+   }
+   printf("Random array:\n");
+   for(i=0;i<5;i++)
+   {
+       printf("%d\n",A[i]);
+   }
+
+   double start = omp_get_wtime();
+   #pragma omp parallel for
+   for(i=0;i<N;i++)
+   {
+      A[i] = A[i] + n;
+   }
+   double end = omp_get_wtime();
+   printf("\nTime Taken : %f seconds \n",end-start);
+   printf("Resultant Array:\n");
+   for(i=0;i<5;i++)
+   {
+      printf("%d\n",A[i]);
+   }
+   free(A);
+   return 0;
+}
