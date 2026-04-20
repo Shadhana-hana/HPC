@@ -1,0 +1,104 @@
+#include <stdio.h>
+#include <string.h>
+#include <ctype.h>
+#include <mpi.h>
+
+#define MAX_STRINGS 3 // Number of strings each process will send
+#define STRING_LENGTH 100 // Maximum length of each string
+
+int isPalindrome(char str[])
+{
+    int i, len = strlen(str);
+    for (i = 0; i < len / 2; i++)
+    {
+        if (str[i] != str[len - i - 1])
+            return 0;
+    }
+    return 1;
+}
+
+int main(int argc, char *argv[])
+{
+    int rank, size;
+    char msg[MAX_STRINGS][STRING_LENGTH]; // Array of strings for master
+
+    MPI_Init(&argc, &argv);
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    MPI_Comm_size(MPI_COMM_WORLD, &size);
+
+    // Start timing for each process
+    double start_time = MPI_Wtime();
+
+    if (rank == 0)   // MASTER PROCESS
+    {
+        MPI_Status status;
+
+        for (int i = 1; i < size; i++)
+        {
+            for (int j = 0; j < MAX_STRINGS; j++)
+            {
+                MPI_Recv(msg[j], STRING_LENGTH, MPI_CHAR, i, MPI_ANY_TAG,
+                         MPI_COMM_WORLD, &status);
+
+                if (status.MPI_TAG == 1)   // Uppercase
+                {
+                    for (int k = 0; msg[j][k]; k++)
+                        msg[j][k] = toupper(msg[j][k]);
+
+                    printf("From rank %d | Type 1 | Uppercase: %s\n", i, msg[j]);
+                }
+                else if (status.MPI_TAG == 2)   // Palindrome
+                {
+                    if (isPalindrome(msg[j]))
+                        printf("From rank %d | Type 2 | Palindrome: YES\n", i);
+                    else
+                        printf("From rank %d | Type 2 | Palindrome: NO\n", i);
+                }
+            }
+        }
+
+        // Stop timing and print the execution time for the master
+        double end_time = MPI_Wtime();
+        printf("Master process execution time: %.6f seconds\n", end_time - start_time);
+    }
+    else   // WORKER PROCESSES
+    {
+        char strings_to_send[MAX_STRINGS][STRING_LENGTH];
+
+        if (rank % 2 == 1)   // Odd rank
+        {
+            // Prepare strings for sending
+            strcpy(strings_to_send[0], "welcome");
+            strcpy(strings_to_send[1], "home bairav");
+            strcpy(strings_to_send[2], "hello");
+
+            // Send messages
+            for (int j = 0; j < MAX_STRINGS; j++)
+            {
+                MPI_Send(strings_to_send[j], strlen(strings_to_send[j]) + 1, MPI_CHAR,
+                         0, 1, MPI_COMM_WORLD);
+            }
+        }
+        else   // Even rank
+        {
+            // Prepare strings for sending
+            strcpy(strings_to_send[0], "madam");
+            strcpy(strings_to_send[1], "level");
+            strcpy(strings_to_send[2], "nivethidha");
+
+            // Send messages
+            for (int j = 0; j < MAX_STRINGS; j++)
+            {
+                MPI_Send(strings_to_send[j], strlen(strings_to_send[j]) + 1, MPI_CHAR,
+                         0, 2, MPI_COMM_WORLD);
+            }
+        }
+
+        // Stop timing and print the execution time for each worker
+        double end_time = MPI_Wtime();
+        printf("Worker process %d execution time: %.6f seconds\n", rank, end_time - start_time);
+    }
+
+    MPI_Finalize();
+    return 0;
+}
