@@ -1,0 +1,96 @@
+#include <mpi.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <stddef.h>
+
+#define MAX_NAME 20
+
+typedef struct {
+    char name[MAX_NAME];
+    int roll;
+    int marks;
+    char grade;
+} Student;
+
+char get_grade(int m) {
+    if (m >= 80) return 'A';
+    if (m >= 60) return 'B';
+    if (m >= 40) return 'C';
+    return 'F';
+}
+
+int main(int argc, char** argv) {
+    int rank, size;
+    MPI_Init(&argc, &argv);
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    MPI_Comm_size(MPI_COMM_WORLD, &size);
+
+
+    if (rank == 0) {
+        printf("Master: Starting processing with %d processes.\n", size);
+    }
+
+
+    MPI_Datatype student_type;
+    int lengths[4] = {MAX_NAME, 1, 1, 1};
+    MPI_Aint offsets[4];
+    MPI_Datatype types[4] = {MPI_CHAR, MPI_INT, MPI_INT, MPI_CHAR};
+
+    offsets[0] = offsetof(Student, name);
+    offsets[1] = offsetof(Student, roll);
+    offsets[2] = offsetof(Student, marks);
+    offsets[3] = offsetof(Student, grade);
+
+    MPI_Type_create_struct(4, lengths, offsets, types, &student_type);
+    MPI_Type_commit(&student_type);
+
+    Student *all_students = NULL;
+    Student local_student;
+
+    if (rank == 0) {
+        all_students = (Student*)malloc(size * sizeof(Student));
+        FILE *fp = fopen("students.txt", "r");
+        if (!fp) {
+            printf("Error opening file!\n");
+            MPI_Abort(MPI_COMM_WORLD, 1);
+        }
+        for (int i = 0; i < size; i++) {
+            if(fscanf(fp, "%s %d %d", all_students[i].name, &all_students[i].roll, &all_students[i].marks) == EOF) break;
+        }
+        fclose(fp);
+        printf("Master: Data read from file. Scattering data...\n");
+    }
+
+
+    MPI_Scatter(all_students, 1, student_type, &local_student, 1, student_type, 0, MPI_COMM_WORLD);
+
+
+    local_student.grade = get_grade(local_student.marks);
+    printf("Process %d: Calculated grade '%c' for student %s (Roll: %d)\n",
+            rank, local_student.grade, local_student.name, local_student.roll);
+
+
+    MPI_Gather(&local_student, 1, student_type, all_students, 1, student_type, 0, MPI_COMM_WORLD);
+
+
+    if (rank == 0) {
+        printf("\nMaster: All grades gathered. Final Results:\n");
+        printf("%-15s %-10s %-10s %-5s\n", "NAME", "ROLL", "MARKS", "GRADE");
+        printf("--------------------------------------------------\n");
+        for (int i = 0; i < size; i++) {
+            printf("%-15s %-10d %-10d %-5c\n",
+                   all_students[i].name, all_students[i].roll, all_students[i].marks, all_students[i].grade);
+        }
+        free(all_students);
+    }
+
+    MPI_Type_free(&student_type);
+    MPI_Finalize();
+    return 0;
+[23bcs024@mepcolinux ex4]$cat students.txt
+alice 301 78
+bob 302 55
+carol 303 82
+dave 304 65
+eve 305 92
